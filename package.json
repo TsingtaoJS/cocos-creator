@@ -1,0 +1,22 @@
+{
+    "name": "@tsingtao/cocos-creator",
+    "version": "0.0.1",
+    "description": "",
+    "main": "dist/index.js",
+    "files": [
+        "dist",
+        "types"
+    ],
+    "types": "./types/index.d.ts",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "events": "^3.3.0",
+        "lodash": "^4.17.21"
+    },
+    "devDependencies": {
+        "@types/events": "^3.0.3",
+        "@types/lodash": "^4.14.202"
+    }
+}
