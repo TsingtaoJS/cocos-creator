@@ -33,6 +33,8 @@ declare interface Socket {
 
     send(msg: object | string, event?: Events): void
     close(code: number, reason?: string): void
+
+    clear(): void
 }
 
 class Logger {
@@ -74,10 +76,7 @@ export default class Session extends EventEmitter {
         this.logger = opts.logger || (opts.logger = new Logger())
         this.listener()
 
-        this.on('close', (event) => {
-            delete this.socket
-            this._listeners.forEach((emitter) => emitter.emit('close', event))
-        })
+        this.on('close', (event) => this._listeners.forEach((emitter) => emitter.emit('close', event)))
         this.on('ready', (event) => this._listeners.forEach((emitter) => emitter.emit('ready', event)))
     }
 
@@ -101,12 +100,6 @@ export default class Session extends EventEmitter {
         if (uri) this.uri = uri
 
         if (this.socket) {
-            if (this.socket.status == SocketStatus.CONNECTING) {
-                return new Promise((resole, reject) => {
-                    this.once('ready', resole)
-                    this.once('error', reject)
-                })
-            }
             return
         }
 
@@ -126,11 +119,12 @@ export default class Session extends EventEmitter {
                 case 'http':
                 case 'https':
                 case 'quic':
-                    throw new Error('not support yet')
             }
         }
 
-        if (!this.socket) return
+        if (!this.socket) throw new Error('not support yet')
+
+        this.emit('connecting', this.retries)
 
         this.socket.on('open', () => {
             this.logger.trace('scoket open')
@@ -161,6 +155,12 @@ export default class Session extends EventEmitter {
         })
 
         this.socket.on('close', (code, reason) => {
+            if (this.socket) {
+                this.socket.clear()
+                delete this.socket
+                this.socket = undefined
+            }
+
             this.logger.trace('socket close', { code, reason })
             if (code >= 3000) {
                 this.retries = 0
@@ -168,14 +168,12 @@ export default class Session extends EventEmitter {
             } else {
                 this.retries++
                 if (!this.opts.maxRetries || this.retries > this.opts.maxRetries) {
-                    this.retries = 0
                     this.emit('close', { code, reason })
+                    this.logger.debug('max retries reached, stop retrying', { retries: this.retries })
+                    this.retries = 0
                 } else {
-                    delete this.socket
-                    this.socket = undefined
-                    setTimeout(() => {
-                        this.connect()
-                    }, 1000)
+                    this.logger.debug('reconnect in 1s', { retries: this.retries })
+                    setTimeout(() => this.connect(), 1000)
                 }
             }
         })
@@ -194,16 +192,16 @@ export default class Session extends EventEmitter {
             this.retries = 0
             this.emit('ready', body)
         })
-
-        return new Promise((resole, reject) => {
-            this.once('ready', resole)
-            this.once('error', reject)
-        })
     }
 
     async request(route: string, params: any, opts?: { mutex: string | boolean }) {
         if (this.status !== SocketStatus.OPEN) {
-            await this.connect()
+            this.connect()
+            await new Promise((resolve, reject) => {
+                this.once('ready', resolve)
+                this.once('error', reject)
+            })
+            this.logger.debug('socket ready, send request', { route, params })
         }
 
         const pendding = opts && opts.mutex ? find(this.askings, { route: typeof opts.mutex === 'boolean' ? route : opts.mutex }) : undefined
@@ -214,7 +212,7 @@ export default class Session extends EventEmitter {
 
         const id = ++this.requestId
         const promise = new Promise((resolve, reject) => {
-            this.socket?.send({ id, route, params })
+            this.socket && this.socket.send({ id, route, params })
             const timeout = setTimeout(() => {
                 reject(new Error('timeout'))
                 this.penddings.delete(id)
@@ -234,9 +232,14 @@ export default class Session extends EventEmitter {
 
     async notify(route: string, params: any) {
         if (this.status !== SocketStatus.OPEN) {
-            await this.connect()
+            this.connect()
+            await new Promise((resolve, reject) => {
+                this.once('ready', resolve)
+                this.once('error', reject)
+            })
+            this.logger.debug('socket ready, send notify', { route, params })
         }
-        this.socket?.send({ route, params })
+        this.socket && this.socket.send({ route, params })
     }
 
     close(reason?: string) {

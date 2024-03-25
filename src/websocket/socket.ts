@@ -115,24 +115,9 @@ export class WebSocketImpl extends EventEmitter {
             }
         }
 
-        const _opening = setTimeout(() => {
-            clearInterval(this._timer)
-            this.emit('error', new Error('timeout'))
-            this.socket.close(1000, 'timeout')
-        }, 5000)
-
-        this.socket.onopen = () => {
-            clearTimeout(_opening)
-            this.emit('open')
-        }
-
-        this.socket.onclose = (event) => {
-            clearInterval(this._timer)
-            if (this._pingtimer) clearTimeout(this._pingtimer)
-            this.emit('close', event.code, event.reason)
-        }
-
-        this.socket.onerror = this.emit.bind(this, 'error')
+        this.socket.onopen = () => this.emit('open')
+        this.socket.onclose = (event) => this.emit('close', event.code, event.reason)
+        this.socket.onerror = (error) => this.emit('error', error)
 
         this._timer = setInterval(() => {
             if (Date.now() - this._active > opts.timeout) {
@@ -159,8 +144,15 @@ export class WebSocketImpl extends EventEmitter {
     }
 
     close(code: number, reason?: string) {
-        if (this.status === SocketStatus.OPEN) {
-            this.socket.close(code, reason)
-        }
+        if (this.status === SocketStatus.CLOSED) return
+
+        this.logger.trace('close socket', { code, reason })
+        this.clear()
+        this.socket.close(code, reason)
+    }
+
+    clear() {
+        if (this._pingtimer) clearTimeout(this._pingtimer)
+        if (this._timer) clearInterval(this._timer)
     }
 }
