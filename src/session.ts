@@ -68,6 +68,7 @@ export default class Session extends EventEmitter {
     _listeners: Map<string, EventEmitter> = new Map()
     constructor(uri: string, opts: Options) {
         super()
+
         this.opts = opts
         this.uri = uri
         this.logger = opts.logger || (opts.logger = new Logger())
@@ -99,7 +100,15 @@ export default class Session extends EventEmitter {
     connect(uri?: string) {
         if (uri) this.uri = uri
 
-        if (this.socket) return
+        if (this.socket) {
+            if (this.socket.status == SocketStatus.CONNECTING) {
+                return new Promise((resole, reject) => {
+                    this.once('ready', resole)
+                    this.once('error', reject)
+                })
+            }
+            return
+        }
 
         this.logger.trace('connect to server', { uri: this.uri })
         const protos = /^(\w+)\:\/\//.exec(this.uri)
@@ -117,8 +126,10 @@ export default class Session extends EventEmitter {
                 case 'http':
                 case 'https':
                 case 'quic':
+                    throw new Error('not support yet')
             }
         }
+
         if (!this.socket) return
 
         this.socket.on('open', () => {
@@ -183,12 +194,18 @@ export default class Session extends EventEmitter {
             this.retries = 0
             this.emit('ready', body)
         })
+
+        return new Promise((resole, reject) => {
+            this.once('ready', resole)
+            this.once('error', reject)
+        })
     }
 
-    request(route: string, params: any, opts?: { mutex: string | boolean }) {
+    async request(route: string, params: any, opts?: { mutex: string | boolean }) {
         if (this.status !== SocketStatus.OPEN) {
-            return
+            await this.connect()
         }
+
         const pendding = opts && opts.mutex ? find(this.askings, { route: typeof opts.mutex === 'boolean' ? route : opts.mutex }) : undefined
         if (pendding) {
             this.logger.debug('pendding request', route, params, this.askings)
@@ -215,9 +232,9 @@ export default class Session extends EventEmitter {
         return promise
     }
 
-    notify(route: string, params: any) {
+    async notify(route: string, params: any) {
         if (this.status !== SocketStatus.OPEN) {
-            return
+            await this.connect()
         }
         this.socket?.send({ route, params })
     }

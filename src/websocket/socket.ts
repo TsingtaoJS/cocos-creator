@@ -47,6 +47,7 @@ export class WebSocketImpl extends EventEmitter {
     _pingtimer: number = 0
     _active: number = Date.now()
     logger: any
+
     constructor(url: string, opts: { cert?: string; timeout: number; logger: any }) {
         super()
         this.logger = opts.logger
