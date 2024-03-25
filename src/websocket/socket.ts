@@ -115,7 +115,11 @@ export class WebSocketImpl extends EventEmitter {
             }
         }
 
-        this.socket.onopen = this.emit.bind(this, 'open')
+        const _opening = setTimeout(() => this.emit('error', new Error('timeout')), 5000)
+        this.socket.onopen = () => {
+            clearTimeout(_opening)
+            this.emit('open')
+        }
 
         this.socket.onclose = (event) => {
             clearInterval(this._timer)
@@ -127,7 +131,7 @@ export class WebSocketImpl extends EventEmitter {
 
         this._timer = setInterval(() => {
             if (Date.now() - this._active > opts.timeout) {
-                this.close(1000, 'timeout')
+                this.emit('error', new Error('timeout'))
             }
         }, 1000)
     }
