@@ -10,11 +10,12 @@ function decode(binary: ArrayBuffer) {
 }
 
 function encode(event: number, binary: Uint8Array) {
+    if (binary.byteLength > 0xff0000) throw new Error('body too large')
     const length = binary.byteLength & 0xffffff
     const body = new Uint8Array(length + 4)
     body[0] = event & 0xff
-    body[1] = (length >> 16) & 0xff0000
-    body[2] = (length >> 8) & 0xff00
+    body[1] = (length & 0xff0000) >> 16
+    body[2] = (length & 0xff00) >> 8
     body[3] = length & 0xff
     body.set(binary, 4)
     return body
