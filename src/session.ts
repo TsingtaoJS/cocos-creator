@@ -199,7 +199,7 @@ export default class Session extends EventEmitter {
             this.connect()
             await new Promise((resolve, reject) => {
                 this.once('ready', resolve)
-                this.once('error', reject)
+                this.once('close', reject)
             })
             this.logger.debug('socket ready, send request', { route, params })
         }
@@ -235,7 +235,7 @@ export default class Session extends EventEmitter {
             this.connect()
             await new Promise((resolve, reject) => {
                 this.once('ready', resolve)
-                this.once('error', reject)
+                this.once('close', reject)
             })
             this.logger.debug('socket ready, send notify', { route, params })
         }
