@@ -27,8 +27,8 @@ export declare interface Options {
 }
 
 export declare interface EventEmitter {
-    on(event: 'ready', listener: (body: any) => void): this
-    once(event: 'ready', listener: (body: any) => void): this
+    on(event: 'ready', listener: (body: { binded: string | undefined; distance: number }) => void): this
+    once(event: 'ready', listener: (body: { binded: string | undefined; distance: number }) => void): this
 
     on(event: 'connecting', listener: (body: any) => void): this
     once(event: 'connecting', listener: (body: any) => void): this
